@@ -1,203 +1,153 @@
-define(['jquery', 'underscore', 'twigjs'], function ($, _, Twig) {
+define(['jquery'], function ($) {
   var CustomWidget = function () {
     var self = this;
 
-    this.getTemplate = _.bind(function (template, params, callback) {
-      params = (typeof params == 'object') ? params : {};
-      template = template || '';
-
-      return this.render({
-        href: '/templates/' + template + '.twig',
-        base_path: this.params.path,
-        v: this.get_version(),
-        load: callback
-      }, params);
-    }, this);
-
     this.callbacks = {
       render: function () {
-        console.log('render');
         return true;
       },
-      init: _.bind(function () {
-        console.log('init');
+      init: function () {
         self.addSummationLogic();
-        AMOCRM.addNotificationCallback(self.get_settings().widget_code, function (data) {
-          console.log(data)
-        });
-
-        this.add_action("phone", function (params) {
-          /**
-           * код взаимодействия с виджетом телефонии
-           */
-          console.log(params)
-        });
-
-        this.add_source("sms", function (params) {
-          /**
-           params - это объект в котором будут  необходимые параметры для отправки смс
-
-           {
-             "phone": 75555555555,   // телефон получателя
-             "message": "sms text",  // сообщение для отправки
-             "contact_id": 12345     // идентификатор контакта, к которому привязан номер телефона
-          }
-           */
-
-          return new Promise(_.bind(function (resolve, reject) {
-            // тут будет описываться логика для отправки смс
-            self.crm_post(
-              'https://example.com/',
-              params,
-              function (msg) {
-                console.log(msg);
-                resolve();
-              },
-              'text'
-            );
-          }, this)
-          );
-        });
-
         return true;
-      }, this),
+      },
       bind_actions: function () {
-        console.log('bind_actions');
         return true;
       },
       settings: function () {
+        self.renderSettings();
         return true;
       },
       onSave: function () {
-        alert('click');
+        self.saveSettings();
         return true;
       },
       destroy: function () {
-
       },
-      contacts: {
-        //select contacts in list and clicked on widget name
-        selected: function () {
-          console.log('contacts');
-        }
-      },
-      leads: {
-        //select leads in list and clicked on widget name
-        selected: function () {
-          console.log('leads');
-        }
-      },
-      tasks: {
-        //select taks in list and clicked on widget name
-        selected: function () {
-          console.log('tasks');
-        }
-      },
-      advancedSettings: _.bind(function () {
-        var $work_area = $('#work-area-' + self.get_settings().widget_code),
-          $save_button = $(
-            Twig({ ref: '/tmpl/controls/button.twig' }).render({
-              text: 'Сохранить',
-              class_name: 'button-input_blue button-input-disabled js-button-save-' + self.get_settings().widget_code,
-              additional_data: ''
-            })
-          ),
-          $cancel_button = $(
-            Twig({ ref: '/tmpl/controls/cancel_button.twig' }).render({
-              text: 'Отмена',
-              class_name: 'button-input-disabled js-button-cancel-' + self.get_settings().widget_code,
-              additional_data: ''
-            })
-          );
-
-        console.log('advancedSettings');
-
-        $save_button.prop('disabled', true);
-        $('.content__top__preset').css({ float: 'left' });
-
-        $('.list__body-right__top').css({ display: 'block' })
-          .append('<div class="list__body-right__top__buttons"></div>');
-        $('.list__body-right__top__buttons').css({ float: 'right' })
-          .append($cancel_button)
-          .append($save_button);
-
-        self.getTemplate('advanced_settings', {}, function (template) {
-          var $page = $(
-            template.render({ title: self.i18n('advanced').title, widget_code: self.get_settings().widget_code })
-          );
-
-          $work_area.append($page);
-        });
-      }, self),
-
-      /**
-       * Метод срабатывает, когда пользователь в конструкторе Salesbot размещает один из хендлеров виджета.
-       * Мы должны вернуть JSON код salesbot'а
-       *
-       * @param handler_code - Код хендлера, который мы предоставляем. Описан в manifest.json, в примере равен handler_code
-       * @param params - Передаются настройки виджета. Формат такой:
-       * {
-       *   button_title: "TEST",
-       *   button_caption: "TEST",
-       *   text: "{{lead.cf.10929}}",
-       *   number: "{{lead.price}}",
-       *   url: "{{contact.cf.10368}}"
-       * }
-       *
-       * @return {{}}
-       */
-      onSalesbotDesignerSave: function (handler_code, params) {
-        var salesbot_source = {
-          question: [],
-          require: []
-        },
-          button_caption = params.button_caption || "",
-          button_title = params.button_title || "",
-          text = params.text || "",
-          number = params.number || 0,
-          handler_template = {
-            handler: "show",
-            params: {
-              type: "buttons",
-              value: text + ' ' + number,
-              buttons: [
-                button_title + ' ' + button_caption,
-              ]
-            }
-          };
-
-        console.log(params);
-
-        salesbot_source.question.push(handler_template);
-
-        return JSON.stringify([salesbot_source]);
-      },
+      advancedSettings: function () {
+        self.renderSettings();
+      }
     };
+
+    this.renderSettings = function () {
+      const $settings = $('#widget_settings__fields_wrapper');
+      const settingsHtml = `
+        <style>
+          .widget_settings_block__item_field {
+            margin-bottom: 10px;
+          }
+          .widget_settings_block__item_field label {
+            display: block;
+            margin-bottom: 5px;
+          }
+          .widget_settings_block__item_field select {
+            width: 100%;
+            padding: 5px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+          }
+          .button-input {
+            background-color: #2a85ff;
+            color: white;
+            padding: 10px 15px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+          }
+          .button-input:hover {
+            background-color: #1b74e4;
+          }
+        </style>
+        <div class="widget_settings_block__item_field">
+          <label for="addendA_field">Поле для слагаемого А:</label>
+          <select id="addendA_field" name="addendA_field"></select>
+        </div>
+        <div class="widget_settings_block__item_field">
+          <label for="addendB_field">Поле для слагаемого Б:</label>
+          <select id="addendB_field" name="addendB_field"></select>
+        </div>
+        <div class="widget_settings_block__item_field">
+          <label for="sum_field">Поле для результата:</label>
+          <select id="sum_field" name="sum_field"></select>
+        </div>
+        <button type="button" id="save_settings" class="button-input">Сохранить</button>
+      `;
+      $settings.html(settingsHtml);
+
+      const fields = AMOCRM.constant('account').cf;
+      for (const key in fields) {
+        if (fields.hasOwnProperty(key)) {
+          const field = fields[key];
+          const option = $('<option>').val(field.ID).text(field.NAME);
+          $('#addendA_field, #addendB_field, #sum_field').append(option);
+        }
+      }
+
+      $('#addendA_field').val(self.get_settings().addendA_field);
+      $('#addendB_field').val(self.get_settings().addendB_field);
+      $('#sum_field').val(self.get_settings().sum_field);
+
+      $('#save_settings').on('click', function () {
+        self.saveSettings();
+      });
+    };
+
+    this.saveSettings = function () {
+      const addendA_field = $('#addendA_field').val();
+      const addendB_field = $('#addendB_field').val();
+      const sum_field = $('#sum_field').val();
+
+      if (!addendA_field || !addendB_field || !sum_field) {
+        alert('Ошибка: Все поля должны быть выбраны.');
+        return;
+      }
+
+      if (addendA_field === addendB_field || addendA_field === sum_field || addendB_field === sum_field) {
+        alert('Ошибка: Поля должны быть различны.');
+        return;
+      }
+
+      const settings = {
+        addendA_field: addendA_field,
+        addendB_field: addendB_field,
+        sum_field: sum_field
+      };
+
+      self.set_settings(settings);
+      alert('Настройки сохранены.');
+    };
+
     this.addSummationLogic = function () {
       $(document).off('input', '.card-entity-form .js-control-allow-numeric-negative').on('input', '.card-entity-form .js-control-allow-numeric-negative', function (e) {
-        let addendAField = $('input[name="CFV[577553]"]').val();
-        let addendBField = $('input[name="CFV[577557]"]').val();
+        var target = $(e.target);
+        var fieldName = target.attr('NAME');
+        if (fieldName === "CFV[" + self.get_settings().addendA_field + "]" ||
+          fieldName === "CFV[" + self.get_settings().addendB_field + "]") {
 
-        addendAField = isValidNumber(addendAField) ? parseFloat(addendAField) : 0;
-        addendBField = isValidNumber(addendBField) ? parseFloat(addendBField) : 0;
+          let addendAField = $('input[name="CFV[' + self.get_settings().addendA_field + ']"]').val();
+          let addendBField = $('input[name="CFV[' + self.get_settings().addendB_field + ']"]').val();
 
-        let sum = addendAField + addendBField;
+          addendAField = isValidNumber(addendAField) ? parseFloat(addendAField) : 0;
+          addendBField = isValidNumber(addendBField) ? parseFloat(addendBField) : 0;
 
-        $('input[name="CFV[577559]"]').val(sum);
+          if (isValidSum(addendAField, addendBField)) {
+            let sum = addendAField + addendBField;
+            $('input[name="CFV[' + self.get_settings().sum_field + ']"]').val(sum);
+          } else {
+            alert("Ошибка: Сумма значений превышает допустимый предел.");
+          }
+        }
       });
     };
 
     function isValidNumber(value) {
       const number = parseFloat(value);
-      if (isNaN(number) || !isFinite(number)) {
-        return false;
-      }
-      if (number > Number.MAX_SAFE_INTEGER) {
-        alert("Ошибка: Введенное число превышает максимально допустимое значение.");
-        return false;
-      }
-      return true;
+      return !isNaN(number) && isFinite(number) && number <= Number.MAX_SAFE_INTEGER;
     }
+
+    function isValidSum(addendA, addendB) {
+      return (addendA + addendB) <= Number.MAX_SAFE_INTEGER;
+    }
+
     return this;
   };
 
